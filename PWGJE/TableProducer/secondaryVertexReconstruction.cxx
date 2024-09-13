@@ -163,7 +163,12 @@ struct SecondaryVertexReconstruction {
 
       // Reconstruct the secondary vertex
       int processResult = 0;
-      std::apply([&df, &processResult](const auto&... elems) { processResult = df.process(elems...); }, trackParVars);
+      try {
+        std::apply([&df, &processResult](const auto&... elems) { processResult = df.process(elems...); }, trackParVars);
+      } catch (const std::runtime_error& error) {
+        LOG(info) << "Run time error found: " << error.what() << ". DCAFitterN cannot work, skipping the candidate.";
+        return;
+      }
       if (processResult == 0) {
         return;
       }
@@ -203,7 +208,7 @@ struct SecondaryVertexReconstruction {
       double massSV = RecoDecay::m(std::move(arrayMomenta), massArray);
 
       // fill candidate table rows
-      if (doprocessData3Prongs && numProngs == 3) {
+      if ((doprocessData3Prongs || doprocessData3ProngsExternalMagneticField) && numProngs == 3) {
         sv3prongTableData(analysisJet.globalIndex(),
                           primaryVertex.getX(), primaryVertex.getY(), primaryVertex.getZ(),
                           secondaryVertex[0], secondaryVertex[1], secondaryVertex[2],
@@ -212,7 +217,7 @@ struct SecondaryVertexReconstruction {
                           arrayMomenta[0][2] + arrayMomenta[1][2] + arrayMomenta[2][2],
                           energySV, massSV, chi2PCA, errorDecayLength, errorDecayLengthXY);
         svIndices.push_back(sv3prongTableData.lastIndex());
-      } else if (doprocessData2Prongs && numProngs == 2) {
+      } else if ((doprocessData2Prongs || doprocessData2ProngsExternalMagneticField) && numProngs == 2) {
         sv2prongTableData(analysisJet.globalIndex(),
                           primaryVertex.getX(), primaryVertex.getY(), primaryVertex.getZ(),
                           secondaryVertex[0], secondaryVertex[1], secondaryVertex[2],
@@ -221,7 +226,7 @@ struct SecondaryVertexReconstruction {
                           arrayMomenta[0][2] + arrayMomenta[1][2],
                           energySV, massSV, chi2PCA, errorDecayLength, errorDecayLengthXY);
         svIndices.push_back(sv2prongTableData.lastIndex());
-      } else if (doprocessMCD3Prongs && numProngs == 3) {
+      } else if ((doprocessMCD3Prongs || doprocessMCD3ProngsExternalMagneticField) && numProngs == 3) {
         sv3prongTableMCD(analysisJet.globalIndex(),
                          primaryVertex.getX(), primaryVertex.getY(), primaryVertex.getZ(),
                          secondaryVertex[0], secondaryVertex[1], secondaryVertex[2],
@@ -230,7 +235,7 @@ struct SecondaryVertexReconstruction {
                          arrayMomenta[0][2] + arrayMomenta[1][2] + arrayMomenta[2][2],
                          energySV, massSV, chi2PCA, errorDecayLength, errorDecayLengthXY);
         svIndices.push_back(sv3prongTableMCD.lastIndex());
-      } else if (doprocessMCD2Prongs && numProngs == 2) {
+      } else if ((doprocessMCD2Prongs || doprocessMCD2ProngsExternalMagneticField) && numProngs == 2) {
         sv2prongTableMCD(analysisJet.globalIndex(),
                          primaryVertex.getX(), primaryVertex.getY(), primaryVertex.getZ(),
                          secondaryVertex[0], secondaryVertex[1], secondaryVertex[2],
