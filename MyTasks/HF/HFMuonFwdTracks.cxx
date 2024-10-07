@@ -50,14 +50,6 @@ struct HFMuonFwdTracks {
                     auto muEta = mcParticle.eta();
                     if (muEta >= -4.0 && muEta <= -2.5) histos.fill(HIST("muPtHistReco"), mcParticle.pt()); // forward eta region
 
-                    // look for HF mother
-                    auto const& muMother = mcParticle.mothers_first_as<aod::McParticles>();
-                    auto muMotherPDG = abs(muMother.pdgCode());
-                    auto motherStatusCode = muMother.getGenStatusCode();
-                    if (abs(muMotherPDG) >= 411 && abs(muMotherPDG) <= 435) { // D meson parent - can be prompt/no-prompt
-                        histos.fill(HIST("muPtHistRecoD"), mcParticle.pt());
-                    }
-
                     // check if duplicate (ambiguous track)
                     int occuranceCount = count(selectedTracksID.begin(), selectedTracksID.end(), muID);
 
@@ -72,8 +64,30 @@ struct HFMuonFwdTracks {
                         auto muChi2 = track.chi2();
                         auto muChi2MCHMID = track.chi2MatchMCHMID();
                         auto muChi2MCHMFT = track.chi2MatchMCHMFT();
-                        int isPrompt = 0;
-                        if (abs(motherStatusCode) >= 81 && abs(motherStatusCode) <= 89) isPrompt = 1;
+
+                        // look for HF mother
+                        auto muMother = mcParticle.mothers_first_as<aod::McParticles>();
+                        auto muMotherPDG = abs(muMother.pdgCode());
+                        auto motherStatusCode = muMother.getGenStatusCode();
+                        if (abs(muMotherPDG) >= 411 && abs(muMotherPDG) <= 435) { // D meson parent - can be prompt/no-prompt
+                            histos.fill(HIST("muPtHistRecoD"), mcParticle.pt());
+                        }
+
+                        // check whether is prompt HF hadron
+                        auto mcPart(muMother);
+                        auto prevMcPart(muMother);
+                        auto mcPartPDG = abs(mcPart.pdgCode());
+                        int isPrompt = 1;
+                        std::cout << "==== Forward muon decay chain: mu";
+                        while (mcPart.has_mothers() && (abs(mcPart.getGenStatusCode()) > 80 || mcPart.getGenStatusCode() == 0)) { // print out mother chain
+                            std::cout << " <- " << mcPartPDG;
+                            prevMcPart = *(mcPart);
+                            mcPart = *(mcPart.mothers_first_as<aod::McParticles>());
+                            mcPartPDG = abs(mcPart.pdgCode());
+                        }
+                        if (div(abs(prevMcPart.pdgCode()), 100).quot != div(muMotherPDG, 100).quot) isPrompt = 0;
+                        std::cout << "; isPrompt = " << isPrompt << std::endl;
+
                         muonTracksOut << muID << "," << muRecoEta << "," << muRecoPt << "," << muRecoP << "," << muRecoPhi << "," << muMotherPDG << "," << std::to_string(muCluster) << "," << muDCA << "," << muChi2 << "," << muChi2MCHMID << "," << muChi2MCHMFT << "," << isPrompt << std::endl;
                         selectedTracksID.emplace(selectedTracksID.end(), muID);
                     }
