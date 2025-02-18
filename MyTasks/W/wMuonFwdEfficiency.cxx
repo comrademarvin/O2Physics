@@ -21,14 +21,15 @@ struct wMuonFwdEfficiency {
         // define axes you want to use
         const AxisSpec axisCounter{1, 0, +1, ""};
         const AxisSpec axisEta{10, -4.0, -2.5, "#eta"};
-        const AxisSpec axisPt{15, 0.0, +80.0, "p_{T} (GeV/c)"};
-        const AxisSpec axisDeltaPt{20, 0.0, +10.0, "|p_{T}^{true} - p_{T}^{reco}|(GeV/c)"};
+        const AxisSpec axisPt{20, 0.0, +80.0, "p_{T} (GeV/c)"};
+        const AxisSpec axisDeltaPt{24, 0.0, +6.0, "|p_{T}^{true} - p_{T}^{reco}|(GeV/c)"};
 
         // create histograms
         histos.add("eventCounterReco", "eventCounterReco", kTH1F, {axisCounter});
         histos.add("eventCounterSim", "eventCounterSim", kTH1F, {axisCounter});
         histos.add("yPtRecoHist", "yPtRecoHist", kTH2F, {axisPt, axisEta});
         histos.add("yPtTruthHist", "yPtTruthHist", kTH2F, {axisPt, axisEta});
+        histos.add("PtRecoHist", "PtRecoHist", kTH1F, {axisPt});
         histos.add("PtTruthHist", "PtTruthHist", kTH1F, {axisPt});
         histos.add("PtResolution", "PtResolution", kTH1F, {axisDeltaPt});
     }
@@ -47,7 +48,8 @@ struct wMuonFwdEfficiency {
                     auto muMotherPDG = abs(muMother.pdgCode());
                     auto muID = mcParticle.globalIndex();
                     bool hasWmother = false;
-                    //std::cout << "==== Mu from W decay chain: mu <- " << muMotherPDG;
+                    // std::cout << "==== Mu from W decay chain: 13(" << mcParticle.eta() << "," << mcParticle.pt() << ")"
+                    //             << " <- " << muMotherPDG << "(" << muMother.eta() << "," << muMother.pt() << ")";
 
                     if (muMotherPDG != 24) {
                         // check if W mother in decay chain
@@ -57,7 +59,7 @@ struct wMuonFwdEfficiency {
                         while (mcPart.has_mothers()) {
                             mcPart = *(mcPart.mothers_first_as<aod::McParticles>());
                             mcPartPDG = abs(mcPart.pdgCode());
-                            //std::cout << " <- " << mcPartPDG;
+                            //std::cout << " <- " << mcPartPDG << "(" << mcPart.eta() << "," << mcPart.pt() << ")";
 
                             if (mcPartPDG == 24) {
                                 hasWmother = true;
@@ -75,6 +77,7 @@ struct wMuonFwdEfficiency {
                         int occuranceCount = count(selectedTracksID.begin(), selectedTracksID.end(), muID);
 
                         if (occuranceCount < 1) {
+                            histos.fill(HIST("PtRecoHist"), mcParticle.pt());
                             histos.fill(HIST("yPtRecoHist"), mcParticle.pt(), mcParticle.eta());
                             histos.fill(HIST("PtResolution"), abs(mcParticle.pt()-track.pt()));
                             selectedTracksID.emplace(selectedTracksID.end(), muID); // add track ID to selected tracks
@@ -103,10 +106,10 @@ struct wMuonFwdEfficiency {
                 auto muMotherPDG = abs(muMother.pdgCode());
 
                 if (muMotherPDG == 24) {
-                    if (mcParticle.eta() > -4.0 && mcParticle.eta() < -2.5) { // muon from W in forward region
-                        histos.fill(HIST("yPtTruthHist"), mcParticle.pt(), mcParticle.eta());
-                    }
+                    //if (mcParticle.eta() > -4.0 && mcParticle.eta() < -2.5) { // muon from W in forward region
+                    histos.fill(HIST("yPtTruthHist"), mcParticle.pt(), mcParticle.eta());
                     histos.fill(HIST("PtTruthHist"), mcParticle.pt());
+                    //}
                 }
             }
         }
