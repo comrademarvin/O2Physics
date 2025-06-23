@@ -48,8 +48,8 @@ struct wMuonFwdEfficiency {
                     auto muMotherPDG = abs(muMother.pdgCode());
                     auto muID = mcParticle.globalIndex();
                     bool hasWmother = false;
-                    // std::cout << "==== Mu from W decay chain: 13(" << mcParticle.eta() << "," << mcParticle.pt() << ")"
-                    //             << " <- " << muMotherPDG << "(" << muMother.eta() << "," << muMother.pt() << ")";
+                    std::cout << "==== Mu decay chain: 13(" << mcParticle.eta() << "," << mcParticle.pt() << ")"
+                                << " <- " << muMotherPDG << "(" << muMother.eta() << "," << muMother.pt() << ")";
 
                     if (muMotherPDG != 24) {
                         // check if W mother in decay chain
@@ -59,7 +59,7 @@ struct wMuonFwdEfficiency {
                         while (mcPart.has_mothers()) {
                             mcPart = *(mcPart.mothers_first_as<aod::McParticles>());
                             mcPartPDG = abs(mcPart.pdgCode());
-                            //std::cout << " <- " << mcPartPDG << "(" << mcPart.eta() << "," << mcPart.pt() << ")";
+                            std::cout << " <- " << mcPartPDG << "(" << mcPart.eta() << "," << mcPart.pt() << ")";
 
                             if (mcPartPDG == 24) {
                                 hasWmother = true;
@@ -69,18 +69,18 @@ struct wMuonFwdEfficiency {
                     } else {
                         hasWmother = true;
                     }
-                    // if (hasWmother) std::cout << " (PICKED)";
-                    // std::cout << std::endl;
+                    if (hasWmother) std::cout << " (PICKED)";
+                    std::cout << std::endl;
 
                     if (hasWmother) {
                         // check if duplicate (ambiguous track)
                         int occuranceCount = count(selectedTracksID.begin(), selectedTracksID.end(), muID);
 
                         if (occuranceCount < 1) {
+                            selectedTracksID.emplace(selectedTracksID.end(), muID); // add track ID to selected tracks
                             histos.fill(HIST("PtRecoHist"), mcParticle.pt());
                             histos.fill(HIST("yPtRecoHist"), mcParticle.pt(), mcParticle.eta());
                             histos.fill(HIST("PtResolution"), abs(mcParticle.pt()-track.pt()));
-                            selectedTracksID.emplace(selectedTracksID.end(), muID); // add track ID to selected tracks
                         }
                     }
                 }
@@ -91,28 +91,28 @@ struct wMuonFwdEfficiency {
 
     //Filter<Tracks> etaFilter = track::eta < -2.5 && track::eta > -4;
 
-    void processSim(aod::McParticles const& mcParticles)
+    void processSim(aod::McCollision const& collision) //, aod::McParticles const& mcParticles)
     {
         histos.fill(HIST("eventCounterSim"), 0.5);
-        for (const auto& mcParticle : mcParticles) {
-            // investigate the hardest process
-            //auto statusCode = abs(mcParticle.getGenStatusCode());
-            // if (statusCode <= 34) {
-            //     LOGF(info, "Hardest process particle has pdg code %d, from collision %d", mcParticle.pdgCode(), mcParticle.mcCollisionId());
-            // }
+        // for (const auto& mcParticle : mcParticles) {
+        //     // investigate the hardest process
+        //     //auto statusCode = abs(mcParticle.getGenStatusCode());
+        //     // if (statusCode <= 34) {
+        //     //     LOGF(info, "Hardest process particle has pdg code %d, from collision %d", mcParticle.pdgCode(), mcParticle.mcCollisionId());
+        //     // }
 
-            if (abs(mcParticle.pdgCode())==13) {
-                auto muMother = mcParticle.mothers_first_as<aod::McParticles>();
-                auto muMotherPDG = abs(muMother.pdgCode());
+        //     if (abs(mcParticle.pdgCode())==13) {
+        //         auto muMother = mcParticle.mothers_first_as<aod::McParticles>();
+        //         auto muMotherPDG = abs(muMother.pdgCode());
 
-                if (muMotherPDG == 24) {
-                    //if (mcParticle.eta() > -4.0 && mcParticle.eta() < -2.5) { // muon from W in forward region
-                    histos.fill(HIST("yPtTruthHist"), mcParticle.pt(), mcParticle.eta());
-                    histos.fill(HIST("PtTruthHist"), mcParticle.pt());
-                    //}
-                }
-            }
-        }
+        //         if (muMotherPDG == 24) {
+        //             //if (mcParticle.eta() > -4.0 && mcParticle.eta() < -2.5) { // muon from W in forward region
+        //             histos.fill(HIST("yPtTruthHist"), mcParticle.pt(), mcParticle.eta());
+        //             histos.fill(HIST("PtTruthHist"), mcParticle.pt());
+        //             //}
+        //         }
+        //     }
+        // }
     }
     PROCESS_SWITCH(wMuonFwdEfficiency, processSim, "W->muon simulation information", true);
 };
