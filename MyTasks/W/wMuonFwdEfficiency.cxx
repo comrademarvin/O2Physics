@@ -91,28 +91,28 @@ struct wMuonFwdEfficiency {
 
     //Filter<Tracks> etaFilter = track::eta < -2.5 && track::eta > -4;
 
-    void processSim(aod::McCollision const& collision) //, aod::McParticles const& mcParticles)
+    void processSim(aod::McCollision const& collision, aod::McParticles const& mcParticles)
     {
         histos.fill(HIST("eventCounterSim"), 0.5);
-        // for (const auto& mcParticle : mcParticles) {
-        //     // investigate the hardest process
-        //     //auto statusCode = abs(mcParticle.getGenStatusCode());
-        //     // if (statusCode <= 34) {
-        //     //     LOGF(info, "Hardest process particle has pdg code %d, from collision %d", mcParticle.pdgCode(), mcParticle.mcCollisionId());
-        //     // }
+        for (const auto& mcParticle : mcParticles) {
+            // investigate the hardest process
+            //auto statusCode = abs(mcParticle.getGenStatusCode());
+            // if (statusCode <= 34) {
+            //     LOGF(info, "Hardest process particle has pdg code %d, from collision %d", mcParticle.pdgCode(), mcParticle.mcCollisionId());
+            // }
 
-        //     if (abs(mcParticle.pdgCode())==13) {
-        //         auto muMother = mcParticle.mothers_first_as<aod::McParticles>();
-        //         auto muMotherPDG = abs(muMother.pdgCode());
+            if (abs(mcParticle.pdgCode())==13) {
+                auto muMother = mcParticle.mothers_first_as<aod::McParticles>();
+                auto muMotherPDG = abs(muMother.pdgCode());
 
-        //         if (muMotherPDG == 24) {
-        //             //if (mcParticle.eta() > -4.0 && mcParticle.eta() < -2.5) { // muon from W in forward region
-        //             histos.fill(HIST("yPtTruthHist"), mcParticle.pt(), mcParticle.eta());
-        //             histos.fill(HIST("PtTruthHist"), mcParticle.pt());
-        //             //}
-        //         }
-        //     }
-        // }
+                if (muMotherPDG == 24) {
+                    //if (mcParticle.eta() > -4.0 && mcParticle.eta() < -2.5) { // muon from W in forward region
+                    histos.fill(HIST("yPtTruthHist"), mcParticle.pt(), mcParticle.eta());
+                    histos.fill(HIST("PtTruthHist"), mcParticle.pt());
+                    //}
+                }
+            }
+        }
     }
     PROCESS_SWITCH(wMuonFwdEfficiency, processSim, "W->muon simulation information", true);
 };
