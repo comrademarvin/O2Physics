@@ -20,9 +20,10 @@ struct wMuonFwdEfficiency {
     {
         // define axes you want to use
         const AxisSpec axisCounter{1, 0, +1, ""};
-        const AxisSpec axisEta{10, -4.0, -2.5, "#eta"};
+        const AxisSpec axisEta{20, -4.0, -2.5, "#eta"};
         const AxisSpec axisPt{20, 0.0, +80.0, "p_{T} (GeV/c)"};
-        const AxisSpec axisDeltaPt{24, 0.0, +6.0, "|p_{T}^{true} - p_{T}^{reco}|(GeV/c)"};
+        const AxisSpec axisDeltaPt{40, 0.0, +20.0, "|p_{T}^{true} - p_{T}^{reco}|(GeV/c)"};
+        const AxisSpec axisChi2{100, 0.0, +100.0, "#chi^2"};
 
         // create histograms
         histos.add("eventCounterReco", "eventCounterReco", kTH1F, {axisCounter});
@@ -32,24 +33,35 @@ struct wMuonFwdEfficiency {
         histos.add("PtRecoHist", "PtRecoHist", kTH1F, {axisPt});
         histos.add("PtTruthHist", "PtTruthHist", kTH1F, {axisPt});
         histos.add("PtResolution", "PtResolution", kTH1F, {axisDeltaPt});
+        histos.add("chi2", "chi2", kTH1F, {axisChi2});
     }
 
     using muonTracks = soa::Join<aod::FwdTracks, aod::McFwdTrackLabels>;
 
-    void processReco(aod::Collision const& collision, muonTracks const& tracks, aod::McParticles const&)
+    void processReco(aod::Collision const& collision, muonTracks const& tracks, aod::McParticles const&) // run with collisions
+    //void processReco(muonTracks const& tracks, aod::McParticles const&) // run without collisions
     {
         histos.fill(HIST("eventCounterReco"), 0.5);
         for (auto& track : tracks) {
             if(track.has_mcParticle()){
                 auto mcParticle = track.mcParticle();
                 auto statusCode = abs(mcParticle.getGenStatusCode());
-                if (abs(mcParticle.pdgCode())==13) {
+
+                if (abs(mcParticle.pdgCode())==13) { // check if associated MC track is a muon
+                    // check if duplicate (ambiguous track)
+                    auto muID = mcParticle.globalIndex();
+                    int occuranceCount = count(selectedTracksID.begin(), selectedTracksID.end(), muID);
+
+                    if (occuranceCount > 0) { // if already selected, move on
+                        continue;
+                    }
+
+                    // check if muon is from W decay
                     auto muMother = mcParticle.mothers_first_as<aod::McParticles>();
                     auto muMotherPDG = abs(muMother.pdgCode());
-                    auto muID = mcParticle.globalIndex();
+                    
                     bool hasWmother = false;
-                    std::cout << "==== Mu decay chain: 13(" << mcParticle.eta() << "," << mcParticle.pt() << ")"
-                                << " <- " << muMotherPDG << "(" << muMother.eta() << "," << muMother.pt() << ")";
+                    std::cout << "==== Mu decay chain: 13 <- " << muMotherPDG;
 
                     if (muMotherPDG != 24) {
                         // check if W mother in decay chain
@@ -59,7 +71,7 @@ struct wMuonFwdEfficiency {
                         while (mcPart.has_mothers()) {
                             mcPart = *(mcPart.mothers_first_as<aod::McParticles>());
                             mcPartPDG = abs(mcPart.pdgCode());
-                            std::cout << " <- " << mcPartPDG << "(" << mcPart.eta() << "," << mcPart.pt() << ")";
+                            std::cout << " <- " << mcPartPDG;
 
                             if (mcPartPDG == 24) {
                                 hasWmother = true;
@@ -73,15 +85,11 @@ struct wMuonFwdEfficiency {
                     std::cout << std::endl;
 
                     if (hasWmother) {
-                        // check if duplicate (ambiguous track)
-                        int occuranceCount = count(selectedTracksID.begin(), selectedTracksID.end(), muID);
-
-                        if (occuranceCount < 1) {
-                            selectedTracksID.emplace(selectedTracksID.end(), muID); // add track ID to selected tracks
-                            histos.fill(HIST("PtRecoHist"), mcParticle.pt());
-                            histos.fill(HIST("yPtRecoHist"), mcParticle.pt(), mcParticle.eta());
-                            histos.fill(HIST("PtResolution"), abs(mcParticle.pt()-track.pt()));
-                        }
+                        selectedTracksID.emplace(selectedTracksID.end(), muID); // add track ID to already processed selected tracks
+                        histos.fill(HIST("PtRecoHist"), mcParticle.pt());
+                        histos.fill(HIST("yPtRecoHist"), mcParticle.pt(), mcParticle.eta());
+                        histos.fill(HIST("PtResolution"), abs(mcParticle.pt()-track.pt()));
+                        histos.fill(HIST("chi2"), track.chi2());
                     }
                 }
             }
