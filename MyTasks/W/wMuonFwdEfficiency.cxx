@@ -14,15 +14,21 @@ struct wMuonFwdEfficiency {
     HistogramRegistry histos{"histos", {},
     OutputObjHandlingPolicy::AnalysisObject};
 
-    // definition of reconstructed info to be saved
+    // definition of reconstructed info to be saved for processing
     struct RecoTrackInfo {
         int64_t trackID;
+        uint8_t trackType;
         float chi2;
         float chi2MatchMCHMID;
+        float chi2MatchMCHMFT;
+        float matchScoreMCHMFT;
+        int32_t matchMFTTrackId;
         float pDca;
         float pt;
         float eta;
+        float ptResolution;
     };
+
     // Map to group reconstructed tracks by their associated simulated track ID
     std::unordered_map<int64_t, std::vector<RecoTrackInfo>> trackGroups;
 
@@ -36,7 +42,7 @@ struct wMuonFwdEfficiency {
         if (!muonTracksOut.is_open()) {
             LOGF(fatal, "Failed to open muonTracks.csv for writing");
         }
-        muonTracksOut << "trackID,chi2,chi2MatchMCHMID,pDCA,pt,eta" << std::endl;
+        muonTracksOut << "trackID,trackType,phi,tgl,signed1Pt,nClusters,pDCA,rAtAbsorberEnd,sign,chi2,chi2MatchMCHMID,chi2MatchMCHMFT,trackTime,eta,pt,p" << std::endl;
 
         // define axes you want to use
         const AxisSpec axisCounter{1, 0, +1, ""};
@@ -53,7 +59,7 @@ struct wMuonFwdEfficiency {
         histos.add("yPtTruthHist", "yPtTruthHist", kTH2F, {axisPt, axisEta});
         histos.add("PtRecoHist", "PtRecoHist", kTH1F, {axisPt});
         histos.add("PtTruthHist", "PtTruthHist", kTH1F, {axisPt});
-        //histos.add("PtResolution", "PtResolution", kTH1F, {axisDeltaPt});
+        histos.add("PtResolution", "PtResolution", kTH1F, {axisDeltaPt});
         histos.add("chi2", "chi2", kTH1F, {axisChi2});
         histos.add("chi2MatchMCHMID", "chi2MatchMCHMID", kTH1F, {axisChi2});
         histos.add("pDCA", "pDCA", kTH1F, {axisDCA});
@@ -67,7 +73,7 @@ struct wMuonFwdEfficiency {
         histos.fill(HIST("eventCounterReco"), 0.5);
 
         for (auto& track : tracks) {
-            if(track.has_mcParticle() && track.chi2MatchMCHMID() > 0) { // check if track has associated MC particle and has a valid chi2 match
+            if(track.has_mcParticle()) { // check if track has associated MC particle and has a valid chi2 match
                 auto mcParticle = track.mcParticle();
                 int64_t recoTrackID = track.globalIndex();    // Reconstructed track ID
 
@@ -103,51 +109,60 @@ struct wMuonFwdEfficiency {
                     // std::cout << std::endl;
 
                     if (hasWmother) {
+                        auto muTrackType = static_cast<int64_t>(track.trackType());
                         auto muChi2 = track.chi2();
                         auto muChi2MatchMCHMID = track.chi2MatchMCHMID();
-                        auto pDca = track.pDca();
-                        auto pt = track.pt();
-                        auto eta = track.eta();
+                        auto muChi2MatchMCHMFT = track.chi2MatchMCHMFT();
+                        auto muMatchScoreMCHMFT = track.matchScoreMCHMFT();
+                        auto muMatchMFTTrackId = track.matchMFTTrackId();
+                        auto muDca = track.pDca();
+                        auto muPt = track.pt();
+                        auto muEta = track.eta();
+                        auto ptResolution = abs(mcParticle.pt() - track.pt());
         
-                        // Store the reconstructed track information in the map
-                        RecoTrackInfo trackInfo = {recoTrackID, muChi2, muChi2MatchMCHMID, pDca, pt, eta};
+                        // Store the reconstructed track information in the map for additional processing, associated with the simulated track ID
+                        RecoTrackInfo trackInfo = {recoTrackID, muTrackType, muChi2, muChi2MatchMCHMID, muChi2MatchMCHMFT, muMatchScoreMCHMFT, muMatchMFTTrackId,
+                            muDca, muPt, muEta, ptResolution};
                         trackGroups[mcTrackID].push_back(trackInfo);
+
+                        // save all muon tracks to the output file
+                        muonTracksOut << recoTrackID << "," << muTrackType << "," << track.phi() << "," << track.tgl() << "," << track.signed1Pt() << ","
+                                    << static_cast<int64_t>(track.nClusters()) << "," << muDca << "," << track.rAtAbsorberEnd() << ","
+                                    << static_cast<int64_t>(track.sign()) << "," << muChi2 << "," << muChi2MatchMCHMID << "," << muChi2MatchMCHMFT << ","
+                                    << track.trackTime() << "," << muEta << "," << muPt << "," << track.p() << std::endl;
+
+                        // basic cuts before plotting
+                        if (muTrackType == 3 && muChi2MatchMCHMID > 0) { // only look at standalone tracks for now
+                            // write to histograms
+                            histos.fill(HIST("PtRecoHist"), muPt);
+                            histos.fill(HIST("yPtRecoHist"), muPt, muEta);
+                            histos.fill(HIST("PtResolution"), ptResolution);
+                            histos.fill(HIST("chi2"), muChi2);
+                            histos.fill(HIST("chi2MatchMCHMID"), muChi2MatchMCHMID);
+                            histos.fill(HIST("pDCA"), muDca);
+                        }
                     }
                 }
             }
         }
 
+        // additional track processing to check the multiple reconstructed tracks associated with the same simulated track
         for (auto& [mcTrackID, recoTracks] : trackGroups) {
-            // prcess tracks to choose track with lowest chi2
-            int trackIndex = 0;
-            int chosenIndex = trackIndex;
-            float minChi2 = 100000.0;
-            for (const auto& trackInfo : recoTracks) {
-                if (trackInfo.chi2 < minChi2) {
-                    minChi2 = trackInfo.chi2;
-                    chosenIndex = trackIndex; // remember the index of the track with the lowest chi2
-                }
-                trackIndex++;
-            }
+            // prcess tracks to choose track with lowest chi2 (this is now pointless?)
+            // int trackIndex = 0;
+            // int chosenIndex = trackIndex;
+            // float minChi2 = 100000.0;
+            // for (const auto& trackInfo : recoTracks) {
+            //     if (trackInfo.chi2 < minChi2) {
+            //         minChi2 = trackInfo.chi2;
+            //         chosenIndex = trackIndex; // remember the index of the track with the lowest chi2
+            //     }
+            //     trackIndex++;
+            // }
 
-            // write to histograms
-            histos.fill(HIST("PtRecoHist"), recoTracks[chosenIndex].pt);
-            histos.fill(HIST("yPtRecoHist"), recoTracks[chosenIndex].pt, recoTracks[chosenIndex].eta);
-            //histos.fill(HIST("PtResolution"), abs(mcParticle.pt-track.pt));
-            histos.fill(HIST("chi2"), recoTracks[chosenIndex].chi2);
-            histos.fill(HIST("chi2MatchMCHMID"), recoTracks[chosenIndex].chi2MatchMCHMID);
-            histos.fill(HIST("pDCA"), recoTracks[chosenIndex].pDca);
-
-            // output to textfile
-            muonTracksOut << recoTracks[chosenIndex].trackID << ","
-                          << recoTracks[chosenIndex].chi2 << ","
-                          << recoTracks[chosenIndex].chi2MatchMCHMID << ","
-                          << recoTracks[chosenIndex].pDca << ","
-                          << recoTracks[chosenIndex].pt << ","
-                          << recoTracks[chosenIndex].eta << std::endl;
-
-            // only print if the first track isn't the best track
-            if (chosenIndex > 0) {
+            // choose when to print the information
+            bool printRecoTracks = false;
+            if (printRecoTracks) {
                 // printing
                 if (recoTracks.size() > 1) {
                     // Output a heading for the simulated track
@@ -155,9 +170,8 @@ struct wMuonFwdEfficiency {
 
                     // List the associated reconstructed tracks
                     for (const auto& trackInfo : recoTracks) {
-                        // Option 1: Using RecoTrackInfo struct
-                        LOGF(info, "RecoTrack: ID = %ld, chi2 = %.2f, chi2MatchMCHMID = %.2f, pDCA = %.2f",
-                                    trackInfo.trackID, trackInfo.chi2, trackInfo.chi2MatchMCHMID, trackInfo.pDca);
+                        LOGF(info, "RecoTrack ID = %ld, Track Type = %d, chi2 = %.2f, chi2MatchMCHMID = %.2f, chi2MatchMCHMFT = %.2f, matchScoreMCHMFT = %.2f, MFT Track ID = %d",
+                        trackInfo.trackID, trackInfo.trackType, trackInfo.chi2, trackInfo.chi2MatchMCHMID, trackInfo.chi2MatchMCHMFT, trackInfo.matchScoreMCHMFT, trackInfo.matchMFTTrackId);
                     }
                 }
                 LOGF(info, "Chosen track has index %d with track ID %ld", chosenIndex, recoTracks[chosenIndex].trackID);
