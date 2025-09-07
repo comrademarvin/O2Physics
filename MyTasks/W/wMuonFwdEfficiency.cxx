@@ -50,6 +50,7 @@ struct wMuonFwdEfficiency {
         const AxisSpec axisPt{20, 0.0, +80.0, "p_{T} (GeV/c)"};
         const AxisSpec axisDeltaPt{40, 0.0, +20.0, "|p_{T}^{true} - p_{T}^{reco}|(GeV/c)"};
         const AxisSpec axisChi2{50, 0.0, +10.0, "#chi^{2}"};
+        const AxisSpec axisChi2Global{50, 0.0, +100.0, "#chi^{2}"};
         const AxisSpec axisDCA{100, 0.0, +1000.0, "pDCA"};
 
         // create histograms
@@ -61,7 +62,9 @@ struct wMuonFwdEfficiency {
         histos.add("PtTruthHist", "PtTruthHist", kTH1F, {axisPt});
         histos.add("PtResolution", "PtResolution", kTH1F, {axisDeltaPt});
         histos.add("chi2", "chi2", kTH1F, {axisChi2});
+        histos.add("chi2_global_track", "chi2_global_track", kTH1F, {axisChi2Global});
         histos.add("chi2MatchMCHMID", "chi2MatchMCHMID", kTH1F, {axisChi2});
+        histos.add("chi2MatchMCHMFT", "chi2MatchMCHMFT", kTH1F, {axisChi2});
         histos.add("pDCA", "pDCA", kTH1F, {axisDCA});
     }
 
@@ -141,6 +144,12 @@ struct wMuonFwdEfficiency {
                             histos.fill(HIST("chi2MatchMCHMID"), muChi2MatchMCHMID);
                             histos.fill(HIST("pDCA"), muDca);
                         }
+
+                        // global muon tracks
+                        if (muTrackType == 0 && muChi2MatchMCHMFT > 0) {
+                            histos.fill(HIST("chi2_global_track"), muChi2);
+                            histos.fill(HIST("chi2MatchMCHMFT"), muMatchScoreMCHMFT);
+                        }
                     }
                 }
             }
@@ -174,7 +183,7 @@ struct wMuonFwdEfficiency {
                         trackInfo.trackID, trackInfo.trackType, trackInfo.chi2, trackInfo.chi2MatchMCHMID, trackInfo.chi2MatchMCHMFT, trackInfo.matchScoreMCHMFT, trackInfo.matchMFTTrackId);
                     }
                 }
-                LOGF(info, "Chosen track has index %d with track ID %ld", chosenIndex, recoTracks[chosenIndex].trackID);
+                //LOGF(info, "Chosen track has index %d with track ID %ld", chosenIndex, recoTracks[chosenIndex].trackID);
             }
         }
     }
