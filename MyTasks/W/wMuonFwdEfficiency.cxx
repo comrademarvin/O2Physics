@@ -52,6 +52,7 @@ struct wMuonFwdEfficiency {
         const AxisSpec axisChi2{50, 0.0, +10.0, "#chi^{2}"};
         const AxisSpec axisChi2Global{50, 0.0, +100.0, "#chi^{2}"};
         const AxisSpec axisDCA{100, 0.0, +1000.0, "pDCA"};
+        const AxisSpec axisTrackType{5, 0, 5, "Track Type"};
 
         // create histograms
         histos.add("eventCounterReco", "eventCounterReco", kTH1F, {axisCounter});
@@ -66,6 +67,7 @@ struct wMuonFwdEfficiency {
         histos.add("chi2MatchMCHMID", "chi2MatchMCHMID", kTH1F, {axisChi2});
         histos.add("chi2MatchMCHMFT", "chi2MatchMCHMFT", kTH1F, {axisChi2});
         histos.add("pDCA", "pDCA", kTH1F, {axisDCA});
+        histos.add("trackType", "trackType", kTH1D, {axisTrackType});
     }
 
     using muonTracks = soa::Join<aod::FwdTracks, aod::McFwdTrackLabels>;
@@ -134,6 +136,8 @@ struct wMuonFwdEfficiency {
                                     << static_cast<int64_t>(track.sign()) << "," << muChi2 << "," << muChi2MatchMCHMID << "," << muChi2MatchMCHMFT << ","
                                     << track.trackTime() << "," << muEta << "," << muPt << "," << track.p() << std::endl;
 
+                        histos.fill(HIST("trackType"), muTrackType);
+                        
                         // basic cuts before plotting
                         if (muTrackType == 3 && muChi2MatchMCHMID > 0) { // only look at standalone tracks for now
                             // write to histograms
