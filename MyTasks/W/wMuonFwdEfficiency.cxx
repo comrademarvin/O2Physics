@@ -8,8 +8,23 @@
 
 using namespace o2;
 using namespace o2::framework;
+using namespace o2::framework::expressions;
+
+using muonTracks = soa::Join<aod::FwdTracks, aod::McFwdTrackLabels>;
 
 struct wMuonFwdEfficiency {
+    // partitions and cuts for muon tracks
+    // Partition<aod::FwdTracks> MuonStandaloneTracks = aod::fwdtrack::trackType == 3;
+    // Partition<aod::FwdTracks> GlobalMuonTracks = aod::fwdtrack::trackType == 0;
+
+    // High pT and quality cuts
+    Filter etaFilter = (aod::fwdtrack::eta < -2.5f) && (aod::fwdtrack::eta > -4.0f);
+    Filter ptFilter = (aod::fwdtrack::pt > 10.0f) && (aod::fwdtrack::pt < 80.0f);
+    Filter chi2Filter = (aod::fwdtrack::chi2 > 0.0f) && (aod::fwdtrack::chi2 < 1000.0f);
+    Filter chi2MatchMCHMIDFilter = (aod::fwdtrack::chi2MatchMCHMID > 0.0f) && (aod::fwdtrack::chi2MatchMCHMID < 1000.0f);
+    Filter pDCAFilter = (aod::fwdtrack::pDca > 0.0f) && (aod::fwdtrack::pDca < 594.0f);
+    Filter rAbsEndFilter = (aod::fwdtrack::rAtAbsorberEnd > 17.6f) && (aod::fwdtrack::rAtAbsorberEnd < 89.5f);
+
     // Histogram registry: an object to hold your histograms
     HistogramRegistry histos{"histos", {},
     OutputObjHandlingPolicy::AnalysisObject};
@@ -42,16 +57,16 @@ struct wMuonFwdEfficiency {
         if (!muonTracksOut.is_open()) {
             LOGF(fatal, "Failed to open muonTracks.csv for writing");
         }
-        muonTracksOut << "trackID,trackType,phi,tgl,signed1Pt,nClusters,pDCA,rAtAbsorberEnd,sign,chi2,chi2MatchMCHMID,chi2MatchMCHMFT,trackTime,eta,pt,p" << std::endl;
+        muonTracksOut << "collisionID,trackID,trackType,phi,tgl,signed1Pt,nClusters,pDCA,rAtAbsorberEnd,sign,chi2,chi2MatchMCHMID,chi2MatchMCHMFT,trackTime,eta,pt,p" << std::endl;
 
         // define axes you want to use
         const AxisSpec axisCounter{1, 0, +1, ""};
         const AxisSpec axisEta{20, -4.0, -2.5, "#eta"};
-        const AxisSpec axisPt{20, 0.0, +80.0, "p_{T} (GeV/c)"};
+        const AxisSpec axisPt{16, 0.0, +80.0, "p_{T} (GeV/c)"};
         const AxisSpec axisDeltaPt{40, 0.0, +20.0, "|p_{T}^{true} - p_{T}^{reco}|(GeV/c)"};
         const AxisSpec axisChi2{50, 0.0, +10.0, "#chi^{2}"};
         const AxisSpec axisChi2Global{50, 0.0, +100.0, "#chi^{2}"};
-        const AxisSpec axisDCA{100, 0.0, +1000.0, "pDCA"};
+        const AxisSpec axisDCA{30, 0.0, +600.0, "pDCA"};
         const AxisSpec axisTrackType{5, 0, 5, "Track Type"};
 
         // create histograms
@@ -70,10 +85,8 @@ struct wMuonFwdEfficiency {
         histos.add("trackType", "trackType", kTH1D, {axisTrackType});
     }
 
-    using muonTracks = soa::Join<aod::FwdTracks, aod::McFwdTrackLabels>;
-
     //void processReco(aod::Collision const& collision, muonTracks const& tracks, aod::McParticles const&) // run with collisions
-    void processReco(muonTracks const& tracks, aod::McParticles const&) // run without collisions
+    void processReco(soa::Filtered<muonTracks> const& tracks, aod::McParticles const&) // run without collisions
     {
         histos.fill(HIST("eventCounterReco"), 0.5);
 
@@ -131,7 +144,7 @@ struct wMuonFwdEfficiency {
                         trackGroups[mcTrackID].push_back(trackInfo);
 
                         // save all muon tracks to the output file
-                        muonTracksOut << recoTrackID << "," << muTrackType << "," << track.phi() << "," << track.tgl() << "," << track.signed1Pt() << ","
+                        muonTracksOut << track.collisionId() << "," << recoTrackID << "," << muTrackType << "," << track.phi() << "," << track.tgl() << "," << track.signed1Pt() << ","
                                     << static_cast<int64_t>(track.nClusters()) << "," << muDca << "," << track.rAtAbsorberEnd() << ","
                                     << static_cast<int64_t>(track.sign()) << "," << muChi2 << "," << muChi2MatchMCHMID << "," << muChi2MatchMCHMFT << ","
                                     << track.trackTime() << "," << muEta << "," << muPt << "," << track.p() << std::endl;
