@@ -24,7 +24,7 @@ struct HFMuonFwdTracks {
         if (!muonTracksOut.is_open()) {
             LOGF(fatal, "Failed to open muonTracks.csv for writing");
         }
-        muonTracksOut << "trackID,trackType,phi,tgl,signed1Pt,nClusters,pDCA,rAtAbsorberEnd,sign,chi2,chi2MatchMCHMID,chi2MatchMCHMFT,trackTime,eta,pt,p" << std::endl;
+        muonTracksOut << "trackID,trackType,firstMotherPDG,phi,tgl,signed1Pt,nClusters,pDCA,rAtAbsorberEnd,sign,chi2,chi2MatchMCHMID,chi2MatchMCHMFT,trackTime,eta,pt,p" << std::endl;
 
         // define axes you want to use
         const AxisSpec axisCounter{1, 0, +1, ""};
@@ -124,10 +124,10 @@ struct HFMuonFwdTracks {
                         if (muTrackType == 3) histos.fill(HIST("muPtHistReco"), muPt); // look at pT for standalone tracks
 
                         // save all muon tracks to the output file
-                        muonTracksOut << recoTrackID << "," << muTrackType << "," << track.phi() << "," << track.tgl() << "," << track.signed1Pt() << ","
-                                    << static_cast<int64_t>(track.nClusters()) << "," << muDca << "," << track.rAtAbsorberEnd() << ","
-                                    << static_cast<int64_t>(track.sign()) << "," << muChi2 << "," << muChi2MatchMCHMID << "," << muChi2MatchMCHMFT << ","
-                                    << track.trackTime() << "," << muEta << "," << muPt << "," << track.p() << std::endl;
+                        muonTracksOut << recoTrackID << "," << muTrackType << "," << muMotherPDG << "," << track.phi() << "," << track.tgl() << ","
+                                    << track.signed1Pt() << "," << static_cast<int64_t>(track.nClusters()) << "," << muDca << ","
+                                    << track.rAtAbsorberEnd() << "," << static_cast<int64_t>(track.sign()) << "," << muChi2 << "," << muChi2MatchMCHMID << ","
+                                    << muChi2MatchMCHMFT << "," << track.trackTime() << "," << muEta << "," << muPt << "," << track.p() << std::endl;
                     };
 
                     // check whether is prompt HF hadron
