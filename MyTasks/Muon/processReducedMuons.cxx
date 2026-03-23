@@ -24,6 +24,7 @@ struct processReducedMuons {
   void init(InitContext&) {
     histos.add("hPt", "Muon pT", HistType::kTH1F, {{100, 0, 100}});
     histos.add("hEta", "Muon eta", HistType::kTH1F, {{100, -5.0, -1.5}});
+    histos.add("hPosZ", "Event z-vertex position", HistType::kTH1F, {{100, -20.0, 20.0}});
 
     // add muons cuts of interest
     muonCuts = new AnalysisCompositeCut(true);
@@ -35,7 +36,7 @@ struct processReducedMuons {
     VarManager::SetDefaultVarNames();
   }
 
-  void process(MyMuonTracks const& muons) {
+  void processMuonStandalone(MyMuonTracks const& muons) {
     for (auto& muon : muons) {
       // Reset the variable values
       VarManager::ResetValues();
@@ -55,7 +56,19 @@ struct processReducedMuons {
         histos.fill(HIST("hEta"), muon.eta());
       }
     }
-  }
+  };
+
+  void processMuonAssoc(aod::ReducedMuonsAssoc const& assocs, aod::ReducedEvents const& events, MyMuonTracks const& muons) {
+    for (auto& assoc : assocs) {
+      //auto muon = muons[assoc.reducedmuonId()];
+      auto event = assoc.template reducedevent_as<aod::ReducedEvents>();
+
+      histos.fill(HIST("hPosZ"), event.posZ());
+    }
+  };
+
+  PROCESS_SWITCH(processReducedMuons, processMuonStandalone, "Run muon selection on stabdalone muon", false);
+  PROCESS_SWITCH(processReducedMuons, processMuonAssoc, "Run event+muon on associated muons", true);
 };
 
 WorkflowSpec defineDataProcessing(ConfigContext const& cfgc)
