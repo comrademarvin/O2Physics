@@ -24,27 +24,28 @@ struct processReducedMuons {
   HistogramRegistry histos{"Histos", {}, OutputObjHandlingPolicy::AnalysisObject};
 
   AnalysisCompositeCut* muonCuts;
-  AnalysisCompositeCut* eventCuts;
+  AnalysisCut* standaloneMuonCut;
 
   void init(InitContext&) {
     // standalone muon
-    histos.add("hPt", "Muon p_{T} distribution;p_{T} (GeV/c);Counts", HistType::kTH1F, {{100, 0, 40}});
-    histos.add("hPt_before_cuts", "Muon p_{T} distribution;p_{T} (GeV/c);Counts", HistType::kTH1F, {{100, 0, 80}});
-    histos.add("hEta", "Muon eta distribution;#eta;Counts", HistType::kTH1F, {{100, -5.0, -1.5}});
-    histos.add("hEta_before_cuts", "Muon eta distribution;#eta;Counts", HistType::kTH1F, {{100, -5.0, -1.5}});
-    histos.add("hPhi", "Muon Phi Angle Distribution;#phi;Counts", HistType::kTH1F, {{100, -4.0, 4.0}});
-    histos.add("hChi", "Muon track #chi^{2} distribution;#chi^{2};Counts", HistType::kTH1F, {{100, 0, 20}});
-    histos.add("hChiMatchMCHMID", "Muon track #chi^{2} of MCH+MID match distribution;#chi^{2} (MCH+MID);Counts", HistType::kTH1F, {{100, 0, 20}});
-    histos.add("hDCAxy", "Muon DCA_{x}+DCA_{y} distribution;DCA_{x} (cm);DCA_{y};Counts", HistType::kTH2F, {{100, -10.0, 10.0},{100, -10.0, 10.0}});
+    histos.add("hPt", "Muon p_{T} distribution after cuts;p_{T} (GeV/c);Counts", HistType::kTH1F, {{100, 0, 20}}, true);
+    histos.add("hPt_before_cuts", "Muon p_{T} distribution before cuts;p_{T} (GeV/c);Counts", HistType::kTH1F, {{100, 0, 20}}, true);
+    histos.add("hEta", "Muon eta distribution after cuts;#eta;Counts", HistType::kTH1F, {{100, -5.0, -1.5}}, true);
+    histos.add("hEta_before_cuts", "Muon eta distribution before cuts;#eta;Counts", HistType::kTH1F, {{100, -5.0, -1.5}}, true);
+    histos.add("hPhi", "Muon phi angle distribution;#phi;Counts", HistType::kTH1F, {{100, -4.0, 4.0}}, true);
+    histos.add("hChi", "Muon track #chi^{2} distribution;#chi^{2};Counts", HistType::kTH1F, {{100, 0, 20}}, true);
+    histos.add("hChiMatchMCHMID", "Muon track #chi^{2} of MCH+MID match distribution;#chi^{2} (MCH+MID);Counts", HistType::kTH1F, {{100, 0, 20}}, true);
+    histos.add("hDCAxy", "Muon DCA_{X}+DCA_{Y} distribution;DCA_{X} (cm);DCA_{Y} (cm);Counts", HistType::kTH2F, {{100, -50.0, 50.0},{100, -50.0, 50.0}});
 
     // standalone events
-    histos.add("hPosZ", "Event Z-vertex distribution;PosZ (cm);Counts", HistType::kTH1F, {{100, -15.0, 15.0}});
-    histos.add("hCentFT0C", "Run 3 centrality from FT0C multiplicity", HistType::kTH1F, {{100, 0.0, 100.0}});
+    histos.add("hPosZ", "Event Z-vertex distribution;Vtx Z (cm);Counts", HistType::kTH1F, {{100, -20.0, 20.0}}, true);
+    histos.add("hCentFT0C", "Run 3 centrality from FT0C multiplicity", HistType::kTH1F, {{100, 0.0, 100.0}}, true);
+    histos.add("hMultTPC", "Track multiplicity from TPC;Multiplicity;Counts", HistType::kTH1D, {{100, 0, 15000}}, true);
 
     // associated muon+events
-    histos.add("hPosZ_assoc", "Associated Event z-vertex position", HistType::kTH1F, {{100, -20.0, 20.0}});
-    histos.add("hMuonsPerEvent", "Number of standalone muons per event", HistType::kTH1D, {{10, 0, 10}});
-    histos.add("hMuonAmbiguity", "Number of standalone muons per recosntructed ID", HistType::kTH1D, {{5, 0, 5}});
+    histos.add("hPosZ_assoc", "Associated muon events Z-vertex position;Vtx Z (cm);Counts", HistType::kTH1F, {{100, -20.0, 20.0}}, true);
+    histos.add("hMuonsPerEvent", "Number of standalone muons per event;Muons per Event;Counts", HistType::kTH1D, {{10, 0, 10}}, true);
+    histos.add("hMuonAmbiguity", "Number of events per standalone muon;Events per Muon;Counts", HistType::kTH1D, {{4, 0, 4}});
 
     // Initialize VarManager
     VarManager::SetDefaultVarNames();
@@ -56,6 +57,8 @@ struct processReducedMuons {
     muonCuts->AddCut(o2::aod::dqcuts::GetAnalysisCut("muonLowPt"));
     //muonCuts->AddCut(o2::aod::dqcuts::GetAnalysisCut("muonHighPt2"));
 
+    standaloneMuonCut = o2::aod::dqcuts::GetAnalysisCut("MCHMID");
+
     VarManager::SetUseVars(AnalysisCut::fgUsedVars); // provide the list of required variables so that VarManager knows what to fill
   }
 
@@ -63,6 +66,7 @@ struct processReducedMuons {
     for (auto& event : events) {
       histos.fill(HIST("hPosZ"), event.posZ());
       histos.fill(HIST("hCentFT0C"), event.centFT0C());
+      histos.fill(HIST("hMultTPC"), event.multTPC());
     }
   }
 
@@ -72,9 +76,11 @@ struct processReducedMuons {
       VarManager::ResetValues();
       VarManager::FillTrack<MuonFillMap>(muon);
 
-      // Fill histograms before cuts
-      histos.fill(HIST("hPt_before_cuts"), muon.pt());
-      histos.fill(HIST("hEta_before_cuts"), muon.eta());
+      // Fill standalone muon histograms before cuts
+      if (standaloneMuonCut->IsSelected(VarManager::fgValues)) {
+        histos.fill(HIST("hPt_before_cuts"), muon.pt());
+        histos.fill(HIST("hEta_before_cuts"), muon.eta());
+      }
 
       // Apply the cut
       if (muonCuts->IsSelected(VarManager::fgValues)) {
