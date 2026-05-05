@@ -144,6 +144,16 @@ MCSignal* o2::aod::dqmcsignals::GetMCSignal(const char* name)
     signal = new MCSignal(name, "Inclusive muons", {prong}, {-1});
     return signal;
   }
+  if (!nameStr.compare("muonFromW")) {
+    MCProng prong(1, {13}, {true}, {false}, {0}, {0}, {false}, false, {24}, {false});
+    signal = new MCSignal(name, "Muons from W decays (W in ancestry)", {prong}, {-1});
+    return signal;
+  }
+  if (!nameStr.compare("muonFromWDirect")) {
+    MCProng prong(2, {13, 24}, {true, true}, {false, false}, {0, 0}, {0, 0}, {false, false});
+    signal = new MCSignal(name, "Muons from direct W->mu decays (direct mother)", {prong}, {-1});
+    return signal;
+  }
   if (!nameStr.compare("electronNOTfromTransport")) {
     MCProng prong(1);
     prong.SetPDGcode(0, 11, true);

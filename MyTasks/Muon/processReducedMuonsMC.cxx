@@ -10,11 +10,18 @@
 #include "PWGDQ/Core/CutsLibrary.h"
 #include "PWGDQ/Core/VarManager.h"
 
+#include <cmath>
+#include <iostream>
+
 using namespace o2;
 using namespace o2::framework;
 using namespace o2::framework::expressions;
 
-using MyMuonTracks = soa::Join<aod::ReducedMuons, aod::ReducedMuonsExtra, aod::ReducedMuonsLabels>;
+// define datamodel by joining relevant tables (with MC labels)
+using MyMuonTracksLabelled = soa::Join<aod::ReducedMuons, aod::ReducedMuonsExtra, aod::ReducedMuonsLabels>;
+
+// define datamodel bit mask for the variable manager to know which variables to fill for the muon objects
+constexpr static uint32_t MuonFillMap = VarManager::ObjTypes::ReducedMuon | VarManager::ObjTypes::ReducedMuonExtra;
 
 struct processReducedMuonsMC {
   HistogramRegistry histos{"Histos", {}, OutputObjHandlingPolicy::AnalysisObject};
@@ -22,45 +29,57 @@ struct processReducedMuonsMC {
   AnalysisCompositeCut* muonCuts;
 
   void init(InitContext&) {
+    // define histograms of interest
     histos.add("hPt", "Muon pT", HistType::kTH1F, {{100, 0, 100}});
     histos.add("hEta", "Muon eta", HistType::kTH1F, {{100, -5.0, -1.5}});
+    histos.add("DCAxy", "Muon DCAxy", HistType::kTH1F, {{100, 0, 10}});
 
-    // add muons cuts of interest
+    // Initialize variable manager for applying cuts (DQ framework thing)
+    VarManager::SetDefaultVarNames();
+
+    // add muon cuts of interest (re-applying some to be safe)
     muonCuts = new AnalysisCompositeCut(true);
     muonCuts->AddCut(o2::aod::dqcuts::GetCompositeCut("muonQualityCuts"));
-    muonCuts->AddCut(o2::aod::dqcuts::GetAnalysisCut("MCHMID"));
-    //muonCuts->AddCut(o2::aod::dqcuts::GetAnalysisCut("muonHighPt2"));
+    muonCuts->AddCut(o2::aod::dqcuts::GetAnalysisCut("matchedMchMid"));
+    muonCuts->AddCut(o2::aod::dqcuts::GetAnalysisCut("muonHighPt5"));
 
-    // Initialize VarManager
-    VarManager::SetDefaultVarNames();
+    // provides the list of required variables so that the variable manager knows what to fill
+    VarManager::SetUseVars(AnalysisCut::fgUsedVars);
   }
 
-  void process(MyMuonTracks const& muons, aod::McParticles const&) {  
+  void process(MyMuonTracksLabelled const& muons, aod::ReducedMCTracks const& mcTracks)
+  {
     for (auto& muon : muons) {
-      // if (muon.has_mcParticle()) { // check if muon has associated MC particle
-      //   auto mcParticle = muon.mcParticle();
-      //   int pdgCode = abs(mcParticle.pdgCode());
+      // Reset the variable values and fill current muon variables
+      VarManager::ResetValues();
+      VarManager::FillTrack<MuonFillMap>(muon);
 
-      //   if (pdgCode == 13) { // check if associated MC particle is a muon
-      //     // Reset the variable values
-      //     VarManager::ResetValues();
+      // check with has_reducedMCTrack, because the label can be missing
+      if (!muon.has_reducedMCTrack()) {
+        continue;
+      }
+      auto mcMuon = mcTracks.rawIteratorAt(muon.reducedMCTrackId()); // access the associated MC track
 
-      //     // Fill the variables for the current muon
-      //     VarManager::fgValues[VarManager::kPt] = muon.pt();
-      //     VarManager::fgValues[VarManager::kEta] = muon.eta();
-      //     VarManager::fgValues[VarManager::kMuonRAtAbsorberEnd] = muon.rAtAbsorberEnd();
-      //     VarManager::fgValues[VarManager::kMuonPDca] = muon.pDca();
-      //     VarManager::fgValues[VarManager::kMuonChi2] = muon.chi2();
-      //     VarManager::fgValues[VarManager::kMuonChi2MatchMCHMID] = muon.chi2MatchMCHMID();
-      //     VarManager::fgValues[VarManager::kMuonTrackType] = muon.trackType();
+      // mcReducedFlags is the MC-signal bit mask produced by tableMakerMC_withAssoc, when passing the cfgMCsignals in the config
+      const uint16_t mcFlags = muon.mcReducedFlags();
+      // for now, assume only configured exactly ONE MC signal in tableMakerMC_withAssoc config (more can be added later)
+      // in that case, bit 0 encodes the decision for that signal
+      if ((mcFlags & static_cast<uint16_t>(0x1u)) == 0u) {
+        continue;
+      }
 
-      //     // Apply the cut
-      //     if (muonCuts->IsSelected(VarManager::fgValues)) {
-      //       histos.fill(HIST("hPt"), muon.pt());
-      //       histos.fill(HIST("hEta"), muon.eta());
-      //     }
-      //   }
-      // }
+      // re-apply muon cuts to be on the safe side
+      if (!muonCuts->IsSelected(VarManager::fgValues)) {
+        continue;
+      }
+
+      // fill histograms
+      histos.fill(HIST("hPt"), muon.pt());
+      histos.fill(HIST("hEta"), muon.eta());
+
+      // compute and fill DCAxy (offset)
+      float DCAxy = std::sqrt(std::pow(muon.fwdDcaX(), 2) + std::pow(muon.fwdDcaY(), 2));
+      histos.fill(HIST("DCAxy"), DCAxy);
     }
   }
 };
